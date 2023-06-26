@@ -1,11 +1,13 @@
 use rand::Rng;
 use std::fmt;
 
-pub struct Pool<const HEIGHT: usize, const WIDTH: usize> {
+#[allow(dead_code)]
+pub struct Pool<const WIDTH: usize, const HEIGHT: usize> {
     /// Alive state of each cell, true is alive.
     state: [[bool; WIDTH]; HEIGHT],
 }
-impl<const HEIGHT: usize, const WIDTH: usize> Default for Pool<HEIGHT, WIDTH> {
+#[allow(dead_code)]
+impl<const WIDTH: usize, const HEIGHT: usize> Default for Pool<WIDTH, HEIGHT> {
     fn default() -> Self {
         const DEFAULT_STATE: bool = false;
         Self {
@@ -13,7 +15,8 @@ impl<const HEIGHT: usize, const WIDTH: usize> Default for Pool<HEIGHT, WIDTH> {
         }
     }
 }
-impl<const HEIGHT: usize, const WIDTH: usize> fmt::Display for Pool<HEIGHT, WIDTH> {
+#[allow(dead_code)]
+impl<const WIDTH: usize, const HEIGHT: usize> fmt::Display for Pool<WIDTH, HEIGHT> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for row in &self.state {
             for cell in row {
@@ -29,7 +32,8 @@ impl<const HEIGHT: usize, const WIDTH: usize> fmt::Display for Pool<HEIGHT, WIDT
         Ok(())
     }
 }
-impl<const HEIGHT: usize, const WIDTH: usize> Pool<HEIGHT, WIDTH> {
+#[allow(dead_code)]
+impl<const WIDTH: usize, const HEIGHT: usize> Pool<WIDTH, HEIGHT> {
     pub fn new() -> Self {
         Self {
             ..Default::default()
@@ -45,8 +49,12 @@ impl<const HEIGHT: usize, const WIDTH: usize> Pool<HEIGHT, WIDTH> {
         }
     }
 
-    pub fn get_state(&self) -> [[bool; WIDTH]; HEIGHT] {
-        self.state
+    pub fn get_state(&self) -> &[[bool; WIDTH]; HEIGHT] {
+        &self.state
+    }
+
+    pub fn get_cell(&self, row: u32, column: u32) -> bool {
+        self.state[row as usize][column as usize]
     }
 
     fn count_alive_neighbors(&self, row: u32, column: u32) -> u8 {

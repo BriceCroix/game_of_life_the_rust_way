@@ -1,14 +1,97 @@
 mod pool;
 
+use glutin_window::GlutinWindow as Window;
+use opengl_graphics::{GlGraphics, OpenGL};
+use piston::event_loop::{EventSettings, Events};
+use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
+use piston::window::WindowSettings;
+
 use pool::Pool;
 
+const WIDTH: usize = 30;
+const HEIGHT: usize = 15;
+const PIXEL_PER_CELL: usize = 20;
+
+pub struct App {
+    gl: GlGraphics, // OpenGL drawing backend.
+    pool: Pool<WIDTH, HEIGHT>,
+}
+impl Default for App {
+    fn default() -> Self {
+        let mut pool: Pool<WIDTH, HEIGHT> = Pool::new();
+        pool.randomize();
+        Self {
+            gl: GlGraphics::new(OpenGL::V3_2),
+            pool: pool,
+        }
+    }
+}
+
+impl App {
+    fn get_cell_pixel_coordinates(row: u32, column: u32) -> (u32, u32) {
+        (row * PIXEL_PER_CELL as u32, column * PIXEL_PER_CELL as u32)
+    }
+
+    pub fn render(&mut self, args: &RenderArgs) {
+        use graphics::*;
+
+        const LIFE_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+        const DEAD_COLOR: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
+
+        self.gl.draw(args.viewport(), |c, gl| {
+            // Clear the screen.
+            clear(DEAD_COLOR, gl);
+
+            // Draw a square for each living cell
+            for i in 0..HEIGHT {
+                for j in 0..WIDTH {
+                    if self.pool.get_cell(i as u32, j as u32) {
+                        let (i_px, j_px) = Self::get_cell_pixel_coordinates(i as u32, j as u32);
+                        rectangle(
+                            LIFE_COLOR,
+                            rectangle::square(0.0, 0.0, PIXEL_PER_CELL as f64),
+                            c.transform.trans(j_px as f64, i_px as f64),
+                            gl,
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn update(&mut self, _args: &UpdateArgs) {
+        self.pool.step();
+    }
+}
+
 fn main() {
-    const HEIGHT: usize = 11;
-    const WIDTH: usize = 11;
-    let mut pool: Pool<HEIGHT, WIDTH> = Default::default();
-    pool.randomize();
-    for _ in 0..10 {
-        pool.step();
-        println!("Pool is :\n{}", pool.to_string());
+    // Change this to OpenGL::V2_1 if not working.
+    let opengl = OpenGL::V3_2;
+
+    // Create a Glutin window.
+    let mut window: Window = WindowSettings::new(
+        "pwet",
+        [
+            (WIDTH * PIXEL_PER_CELL) as u32,
+            (HEIGHT * PIXEL_PER_CELL) as u32,
+        ],
+    )
+    .graphics_api(opengl)
+    .exit_on_esc(true)
+    .build()
+    .unwrap();
+
+    // Create a new game and run it.
+    let mut app: App = Default::default();
+
+    let mut events = Events::new(EventSettings::new());
+    while let Some(e) = events.next(&mut window) {
+        if let Some(args) = e.render_args() {
+            app.render(&args);
+        }
+
+        if let Some(args) = e.update_args() {
+            app.update(&args);
+        }
     }
 }
