@@ -15,14 +15,29 @@ const PIXEL_PER_CELL: usize = 20;
 pub struct App {
     gl: GlGraphics, // OpenGL drawing backend.
     pool: Pool<WIDTH, HEIGHT>,
+    window: Window,
 }
 impl Default for App {
     fn default() -> Self {
         let mut pool: Pool<WIDTH, HEIGHT> = Pool::new();
         pool.randomize();
+        let opengl = OpenGL::V3_2;
+        let window: Window = WindowSettings::new(
+            "Game of life",
+            [
+                (WIDTH * PIXEL_PER_CELL) as u32,
+                (HEIGHT * PIXEL_PER_CELL) as u32,
+            ],
+        )
+        .graphics_api(opengl)
+        .exit_on_esc(true)
+        .build()
+        .unwrap();
+
         Self {
             gl: GlGraphics::new(OpenGL::V3_2),
             pool: pool,
+            window: window,
         }
     }
 }
@@ -62,36 +77,24 @@ impl App {
     pub fn update(&mut self, _args: &UpdateArgs) {
         self.pool.step();
     }
+
+    pub fn run(&mut self) {
+        let mut events = Events::new(EventSettings::new());
+        while let Some(e) = events.next(&mut self.window) {
+            if let Some(args) = e.render_args() {
+                self.render(&args);
+            }
+
+            if let Some(args) = e.update_args() {
+                self.update(&args);
+            }
+        }
+    }
 }
 
 fn main() {
-    // Change this to OpenGL::V2_1 if not working.
-    let opengl = OpenGL::V3_2;
-
-    // Create a Glutin window.
-    let mut window: Window = WindowSettings::new(
-        "pwet",
-        [
-            (WIDTH * PIXEL_PER_CELL) as u32,
-            (HEIGHT * PIXEL_PER_CELL) as u32,
-        ],
-    )
-    .graphics_api(opengl)
-    .exit_on_esc(true)
-    .build()
-    .unwrap();
-
     // Create a new game and run it.
     let mut app: App = Default::default();
 
-    let mut events = Events::new(EventSettings::new());
-    while let Some(e) = events.next(&mut window) {
-        if let Some(args) = e.render_args() {
-            app.render(&args);
-        }
-
-        if let Some(args) = e.update_args() {
-            app.update(&args);
-        }
-    }
+    app.run();
 }
