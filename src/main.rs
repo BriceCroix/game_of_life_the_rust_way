@@ -39,6 +39,7 @@ impl App {
         )
         .graphics_api(opengl)
         .exit_on_esc(true)
+        .resizable(false)
         .build()
         .unwrap();
 
