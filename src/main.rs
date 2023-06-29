@@ -15,20 +15,20 @@ const PIXEL_PER_CELL: usize = 10;
 
 pub struct App {
     gl: GlGraphics, // OpenGL drawing backend.
-    pool: Pool<WIDTH, HEIGHT>,
+    pool: Pool,
     window: Window,
     paused: bool,
     mouse_button_pressed: Option<MouseButton>,
 }
 impl Default for App {
     fn default() -> Self {
-        App::new()
+        App::new(128, 72)
     }
 }
 
 impl App {
-    fn new() -> App {
-        let mut pool: Pool<WIDTH, HEIGHT> = Pool::new();
+    fn new(width: u32, height: u32) -> App {
+        let mut pool: Pool = Pool::new(width, height);
         pool.randomize();
         let window: Window = WindowSettings::new(
             "Game of life",
