@@ -5,7 +5,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
 use piston::window::WindowSettings;
-use piston::{Button, Key, MouseButton, MouseCursorEvent, PressEvent};
+use piston::{Button, Key, MouseButton, MouseCursorEvent, PressEvent, ReleaseEvent};
 
 use pool::Pool;
 
@@ -18,6 +18,7 @@ pub struct App {
     pool: Pool<WIDTH, HEIGHT>,
     window: Window,
     paused: bool,
+    mouse_button_pressed: Option<MouseButton>,
 }
 impl Default for App {
     fn default() -> Self {
@@ -29,7 +30,6 @@ impl App {
     fn new() -> App {
         let mut pool: Pool<WIDTH, HEIGHT> = Pool::new();
         pool.randomize();
-        let opengl = OpenGL::V3_2;
         let window: Window = WindowSettings::new(
             "Game of life",
             [
@@ -37,7 +37,7 @@ impl App {
                 (HEIGHT * PIXEL_PER_CELL) as u32,
             ],
         )
-        .graphics_api(opengl)
+        .graphics_api(OpenGL::V3_2)
         .exit_on_esc(true)
         .resizable(false)
         .build()
@@ -48,6 +48,7 @@ impl App {
             pool: pool,
             window: window,
             paused: false,
+            mouse_button_pressed: None,
         }
     }
 
@@ -95,18 +96,33 @@ impl App {
         }
     }
 
-    fn process_mouse(&mut self, button: MouseButton, cursor_position: [f64; 2]) {
-        match button {
-            MouseButton::Left => {
-                let (row, column) = Self::cursor_to_cell_coordinates(cursor_position);
-                self.pool.set_cell(row, column, true);
+    fn process_mouse_press(&mut self, button: MouseButton) {
+        // Prevent press when already pressed
+        if self.mouse_button_pressed != None {
+            return;
+        }
+        self.mouse_button_pressed = Some(button)
+    }
+
+    fn process_mouse_release(&mut self, button: MouseButton) {
+        // Prevent release when no button currently pressed
+        if let Some(button_already_pressed) = self.mouse_button_pressed {
+            if button != button_already_pressed {
+                return;
             }
-            MouseButton::Right => {
-                let (row, column) = Self::cursor_to_cell_coordinates(cursor_position);
-                self.pool.set_cell(row, column, false);
+        }
+        self.mouse_button_pressed = None;
+    }
+
+    /// Sets or kills cells depending on the button currently pressed on the mouse.
+    fn handle_pressed_mouse(&mut self, cursor: [f64; 2]) {
+        if let Some(pressed_button) = self.mouse_button_pressed {
+            let (row, column) = Self::cursor_to_cell_coordinates(cursor);
+            match pressed_button {
+                MouseButton::Left => self.pool.set_cell(row, column, true),
+                MouseButton::Right => self.pool.set_cell(row, column, false),
+                _ => {}
             }
-            // Discard other buttons
-            _ => {}
         }
     }
 
@@ -139,8 +155,12 @@ impl App {
             });
             // Then process inputs.
             if let Some(Button::Mouse(button)) = e.press_args() {
-                self.process_mouse(button, cursor);
+                self.process_mouse_press(button);
             }
+            if let Some(Button::Mouse(button)) = e.release_args() {
+                self.process_mouse_release(button);
+            }
+            self.handle_pressed_mouse(cursor);
             if let Some(Button::Keyboard(key)) = e.press_args() {
                 self.process_keyboard(key);
             };
