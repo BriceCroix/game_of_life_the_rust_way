@@ -128,10 +128,12 @@ impl App {
 
     fn process_keyboard(&mut self, key: Key) {
         match key {
-            // Pause / Resume when space is pressed
-            Key::Space => {
-                self.paused = !self.paused;
-            }
+            // Space : Pause / Resume when space is pressed
+            Key::Space => self.paused = !self.paused,
+            // Del : Clear pool
+            Key::Delete => self.pool.clear(),
+            // r : Randomize pool
+            Key::R => self.pool.randomize(),
             // Discard other keys
             _ => {}
         }
