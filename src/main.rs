@@ -79,13 +79,22 @@ impl App {
         )
     }
 
+    fn get_selected_pool(&self) -> Pool {
+        match self.selected_pool_structure {
+            SelectedPoolStructure::None => Pool::from_array(&[[true]]),
+            SelectedPoolStructure::Glider => Pool::glider_south_east(),
+            SelectedPoolStructure::Acorn => Pool::acorn(),
+        }
+    }
+
     pub fn render(&mut self, args: &RenderArgs) {
-        // TODO : render paused logo, key bindings, selected pool
-        // TODO : render in gray the structure to be added when clicking left.
         use graphics::*;
 
         const LIFE_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
         const DEAD_COLOR: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
+        const HINT_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 0.5];
+
+        let selected_pool = self.get_selected_pool();
 
         self.gl.draw(args.viewport(), |c, gl| {
             // Clear the screen.
@@ -105,6 +114,26 @@ impl App {
                     }
                 }
             }
+
+            // Draw pixels about to be drawn with transparency
+            let (selected_row, selected_column) = Self::cursor_to_cell_coordinates(self.cursor);
+            for i in 0..selected_pool.height() {
+                for j in 0..selected_pool.width() {
+                    if selected_pool.get_cell(i, j) {
+                        let hint_row = i + selected_row;
+                        let hint_column = j + selected_column;
+                        let (hint_row_px, hint_column_px) =
+                            Self::get_cell_pixel_coordinates(hint_row, hint_column);
+                        rectangle(
+                            HINT_COLOR,
+                            rectangle::square(0.0, 0.0, PIXEL_PER_CELL as f64),
+                            c.transform.trans(hint_column_px as f64, hint_row_px as f64),
+                            gl,
+                        );
+                    }
+                }
+            }
+            // TODO : render paused logo, key bindings
         });
     }
 
@@ -138,11 +167,7 @@ impl App {
             let (row, column) = Self::cursor_to_cell_coordinates(self.cursor);
             match pressed_button {
                 MouseButton::Left => {
-                    let struct_to_add = match self.selected_pool_structure {
-                        SelectedPoolStructure::None => Pool::from_array(&[[true]]),
-                        SelectedPoolStructure::Glider => Pool::glider_south_east(),
-                        SelectedPoolStructure::Acorn => Pool::acorn(),
-                    };
+                    let struct_to_add = self.get_selected_pool();
                     let (row_offset, column_offset) = Self::cursor_to_cell_coordinates(self.cursor);
                     self.pool += struct_to_add.with_offset(row_offset, column_offset)
                 }
