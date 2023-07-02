@@ -177,6 +177,16 @@ impl App {
         }
     }
 
+    /// Select given pool structure to be drawn if not already selected.
+    /// If already selected deselects it.
+    fn select_or_deselect_pool(&mut self, selected_pool: SelectedPoolStructure) {
+        self.selected_pool_structure = if self.selected_pool_structure == selected_pool {
+            SelectedPoolStructure::None
+        } else {
+            selected_pool
+        }
+    }
+
     fn process_keyboard(&mut self, key: Key) {
         match key {
             // Space : Pause / Resume when space is pressed
@@ -186,23 +196,9 @@ impl App {
             // r : Randomize pool
             Key::R => self.pool.randomize(),
             // 1 : select glider
-            Key::NumPad1 => {
-                self.selected_pool_structure =
-                    if self.selected_pool_structure == SelectedPoolStructure::Glider {
-                        SelectedPoolStructure::None
-                    } else {
-                        SelectedPoolStructure::Glider
-                    }
-            }
+            Key::NumPad1 => self.select_or_deselect_pool(SelectedPoolStructure::Glider),
             // 2 : select acorn
-            Key::NumPad2 => {
-                self.selected_pool_structure =
-                    if self.selected_pool_structure == SelectedPoolStructure::Acorn {
-                        SelectedPoolStructure::None
-                    } else {
-                        SelectedPoolStructure::Acorn
-                    }
-            }
+            Key::NumPad2 => self.select_or_deselect_pool(SelectedPoolStructure::Acorn),
 
             // Discard other keys
             _ => {}
