@@ -1,12 +1,10 @@
 use rand::Rng;
-use std::fmt;
+use std::{cmp::min, fmt, ops};
 
 #[allow(dead_code)]
 pub struct Pool {
     /// Alive state of each cell, true is alive.
     state: Vec<Vec<bool>>,
-    // TODO : state should be a vec of vec, state = vec![value; dynamic_size]
-    // WIDTH and HEIGHT therefore become simple parameters.
 }
 #[allow(dead_code)]
 impl fmt::Display for Pool {
@@ -25,6 +23,39 @@ impl fmt::Display for Pool {
         Ok(())
     }
 }
+
+// TODO
+// #[allow(dead_code)]
+// impl ops::Add<Pool> for Pool {
+//     type Output = Self;
+
+//     fn add(self, other: Pool) -> Pool {
+//         let height = min(self.height(), other.height());
+//         let width = min(self.width(), other.width());
+//         let mut result = Pool::new(width, height);
+
+//         for i in 0..height {
+//             for j in 0..width {
+//                 result.state[i as usize][j as usize] = self.get_cell(i, j) || other.get_cell(i, j)
+//             }
+//         }
+//         result
+//     }
+// }
+#[allow(dead_code)]
+impl ops::AddAssign<Pool> for Pool {
+    fn add_assign(&mut self, other: Pool) {
+        let height = min(self.height(), other.height());
+        let width = min(self.width(), other.width());
+
+        for i in 0..height {
+            for j in 0..width {
+                self.state[i as usize][j as usize] = self.get_cell(i, j) || other.get_cell(i, j)
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 impl Pool {
     pub fn new(width: u32, height: u32) -> Self {
@@ -33,6 +64,51 @@ impl Pool {
             state: vec![vec![DEFAULT_STATE; width as usize]; height as usize],
         }
     }
+
+    pub fn from_array<const WIDTH: usize, const HEIGHT: usize>(
+        data: &[[bool; HEIGHT]; WIDTH],
+    ) -> Self {
+        Self {
+            state: Self::convert_2d_array_to_vec(&data),
+        }
+    }
+
+    fn convert_2d_array_to_vec<const WIDTH: usize, const HEIGHT: usize>(
+        arr: &[[bool; HEIGHT]; WIDTH],
+    ) -> Vec<Vec<bool>> {
+        let mut ret = Vec::with_capacity(WIDTH);
+        for row in arr.iter() {
+            let mut vec_row = Vec::with_capacity(HEIGHT);
+            for cell in row.iter() {
+                vec_row.push(cell.to_owned());
+            }
+            ret.push(vec_row)
+        }
+        ret
+    }
+
+    /// Creates a spaceship oriented towards South East.
+    pub fn glider_south_east() -> Self {
+        const DATA: [[bool; 3]; 3] = [
+            [false, true, false],
+            [false, false, true],
+            [true, true, true],
+        ];
+
+        Self::from_array(&DATA)
+    }
+
+    /// Creates an acorn.
+    pub fn acorn() -> Self {
+        const DATA: [[bool; 7]; 3] = [
+            [false, true, false, false, false, false, false],
+            [false, false, false, true, false, false, false],
+            [true, true, false, false, true, true, true],
+        ];
+
+        Self::from_array(&DATA)
+    }
+
     pub fn width(&self) -> u32 {
         match self.state.first() {
             Some(first_row) => first_row.len() as u32,
@@ -49,6 +125,14 @@ impl Pool {
         for row in &mut self.state {
             for cell in row {
                 *cell = rng.gen_bool(0.5);
+            }
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for row in &mut self.state {
+            for cell in row {
+                *cell = false;
             }
         }
     }

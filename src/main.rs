@@ -13,12 +13,26 @@ const WIDTH: usize = 128;
 const HEIGHT: usize = 72;
 const PIXEL_PER_CELL: usize = 10;
 
+#[derive(PartialEq, Eq)]
+enum SelectedPoolStructure {
+    None,
+    Glider,
+    Acorn,
+}
+impl Default for SelectedPoolStructure {
+    fn default() -> Self {
+        SelectedPoolStructure::None
+    }
+}
+
 pub struct App {
     gl: GlGraphics, // OpenGL drawing backend.
     pool: Pool,
     window: Window,
+    cursor: [f64; 2],
     paused: bool,
     mouse_button_pressed: Option<MouseButton>,
+    selected_pool_structure: SelectedPoolStructure,
 }
 impl Default for App {
     fn default() -> Self {
@@ -47,8 +61,10 @@ impl App {
             gl: GlGraphics::new(OpenGL::V3_2),
             pool: pool,
             window: window,
+            cursor: Default::default(),
             paused: false,
             mouse_button_pressed: None,
+            selected_pool_structure: Default::default(),
         }
     }
 
@@ -64,6 +80,8 @@ impl App {
     }
 
     pub fn render(&mut self, args: &RenderArgs) {
+        // TODO : render paused logo, key bindings, selected pool
+        // TODO : render in gray the structure to be added when clicking left.
         use graphics::*;
 
         const LIFE_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
@@ -115,11 +133,19 @@ impl App {
     }
 
     /// Sets or kills cells depending on the button currently pressed on the mouse.
-    fn handle_pressed_mouse(&mut self, cursor: [f64; 2]) {
+    fn handle_pressed_mouse(&mut self) {
         if let Some(pressed_button) = self.mouse_button_pressed {
-            let (row, column) = Self::cursor_to_cell_coordinates(cursor);
+            let (row, column) = Self::cursor_to_cell_coordinates(self.cursor);
             match pressed_button {
-                MouseButton::Left => self.pool.set_cell(row, column, true),
+                MouseButton::Left => {
+                    let struct_to_add = match self.selected_pool_structure {
+                        SelectedPoolStructure::None => Pool::from_array(&[[true]]),
+                        SelectedPoolStructure::Glider => Pool::glider_south_east(),
+                        SelectedPoolStructure::Acorn => Pool::acorn(),
+                    };
+                    let (row_offset, column_offset) = Self::cursor_to_cell_coordinates(self.cursor);
+                    self.pool += struct_to_add.with_offset(row_offset, column_offset)
+                }
                 MouseButton::Right => self.pool.set_cell(row, column, false),
                 _ => {}
             }
@@ -134,6 +160,25 @@ impl App {
             Key::Delete => self.pool.clear(),
             // r : Randomize pool
             Key::R => self.pool.randomize(),
+            // 1 : select glider
+            Key::NumPad1 => {
+                self.selected_pool_structure =
+                    if self.selected_pool_structure == SelectedPoolStructure::Glider {
+                        SelectedPoolStructure::None
+                    } else {
+                        SelectedPoolStructure::Glider
+                    }
+            }
+            // 2 : select acorn
+            Key::NumPad2 => {
+                self.selected_pool_structure =
+                    if self.selected_pool_structure == SelectedPoolStructure::Acorn {
+                        SelectedPoolStructure::None
+                    } else {
+                        SelectedPoolStructure::Acorn
+                    }
+            }
+
             // Discard other keys
             _ => {}
         }
@@ -147,13 +192,11 @@ impl App {
             ..Default::default()
         };
 
-        let mut cursor = [0.0, 0.0];
-
         let mut events = Events::new(event_settings);
         while let Some(e) = events.next(&mut self.window) {
             // First capture mouse position.
             e.mouse_cursor(|pos| {
-                cursor = pos.clone();
+                self.cursor = pos.clone();
             });
             // Then process inputs.
             if let Some(Button::Mouse(button)) = e.press_args() {
@@ -162,7 +205,7 @@ impl App {
             if let Some(Button::Mouse(button)) = e.release_args() {
                 self.process_mouse_release(button);
             }
-            self.handle_pressed_mouse(cursor);
+            self.handle_pressed_mouse();
             if let Some(Button::Keyboard(key)) = e.press_args() {
                 self.process_keyboard(key);
             };
