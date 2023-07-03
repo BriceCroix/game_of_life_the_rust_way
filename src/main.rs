@@ -5,7 +5,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
 use piston::window::WindowSettings;
-use piston::{Button, Key, MouseButton, MouseCursorEvent, PressEvent, ReleaseEvent};
+use piston::{Button, EventLoop, Key, MouseButton, MouseCursorEvent, PressEvent, ReleaseEvent};
 
 use pool::Pool;
 
@@ -33,6 +33,7 @@ pub struct App {
     paused: bool,
     mouse_button_pressed: Option<MouseButton>,
     selected_pool_structure: SelectedPoolStructure,
+    percent_speed: u8,
 }
 impl Default for App {
     fn default() -> Self {
@@ -41,6 +42,9 @@ impl Default for App {
 }
 
 impl App {
+    const MAX_FPS: u64 = 165;
+    const SPEED_STEP: u64 = 10;
+
     fn new(width: u32, height: u32) -> App {
         let mut pool: Pool = Pool::new(width, height);
         pool.randomize();
@@ -65,6 +69,7 @@ impl App {
             paused: false,
             mouse_button_pressed: None,
             selected_pool_structure: Default::default(),
+            percent_speed: 10,
         }
     }
 
@@ -187,7 +192,7 @@ impl App {
         }
     }
 
-    fn process_keyboard(&mut self, key: Key) {
+    fn process_keyboard(&mut self, key: Key, events: &mut Events) {
         match key {
             // Space : Pause / Resume when space is pressed
             Key::Space => self.paused = !self.paused,
@@ -195,10 +200,30 @@ impl App {
             Key::Delete => self.pool.clear(),
             // r : Randomize pool
             Key::R => self.pool.randomize(),
+            // Right / Left : modify speed
+            Key::Left => {
+                if self.percent_speed > 0 {
+                    self.percent_speed -= Self::SPEED_STEP as u8;
+                }
+                if self.percent_speed == 0 {
+                    self.percent_speed = 1;
+                }
+                let new_update_per_second = Self::MAX_FPS * self.percent_speed as u64 / 100;
+                events.set_ups(new_update_per_second);
+            }
+            Key::Right => {
+                if self.percent_speed < 100 {
+                    self.percent_speed += Self::SPEED_STEP as u8;
+                }
+                let new_update_per_second = Self::MAX_FPS * self.percent_speed as u64 / 100;
+                events.set_ups(new_update_per_second);
+            }
             // 1 : select glider
             Key::NumPad1 => self.select_or_deselect_pool(SelectedPoolStructure::Glider),
             // 2 : select acorn
             Key::NumPad2 => self.select_or_deselect_pool(SelectedPoolStructure::Acorn),
+
+            // TODO : add a rotated field for the selected pool structure, to be able to put glider in other directions
 
             // Discard other keys
             _ => {}
@@ -206,15 +231,20 @@ impl App {
     }
 
     pub fn run(&mut self) {
-        const FPS: u64 = 10;
+        let update_per_second = Self::MAX_FPS * self.percent_speed as u64 / 100;
         let event_settings = EventSettings {
-            max_fps: FPS,
-            ups: FPS,
+            max_fps: Self::MAX_FPS,
+            ups: update_per_second,
+            lazy: false,
             ..Default::default()
         };
 
         let mut events = Events::new(event_settings);
+        //events.set_ups(10);
         while let Some(e) = events.next(&mut self.window) {
+            // see https://docs.piston.rs/piston_window/piston_window/trait.EventLoop.html
+            // This has a set_ups method
+
             // First capture mouse position.
             e.mouse_cursor(|pos| {
                 self.cursor = pos.clone();
@@ -228,7 +258,7 @@ impl App {
             }
             self.handle_pressed_mouse();
             if let Some(Button::Keyboard(key)) = e.press_args() {
-                self.process_keyboard(key);
+                self.process_keyboard(key, &mut events);
             };
             // Update state accordingly.
             if let Some(args) = e.update_args() {
