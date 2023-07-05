@@ -1,11 +1,12 @@
 mod pool;
 
-use graphics::types::Color;
-use opengl_graphics::{GlGraphics, GlyphCache, OpenGL, TextureSettings};
-use piston::event_loop::{EventSettings, Events};
-use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
+use graphics::types::{Color, Scalar};
+use opengl_graphics::OpenGL;
+use piston::input::{UpdateArgs, UpdateEvent};
 use piston::window::WindowSettings;
-use piston::{Button, EventLoop, Key, MouseButton, MouseCursorEvent, PressEvent, ReleaseEvent};
+use piston::{
+    Button, Event, EventLoop, Key, MouseButton, MouseCursorEvent, PressEvent, ReleaseEvent,
+};
 use piston_window::PistonWindow as Window;
 
 use pool::Pool;
@@ -27,7 +28,6 @@ impl Default for SelectedPoolStructure {
 }
 
 pub struct App {
-    gl: GlGraphics, // OpenGL drawing backend.
     pool: Pool,
     window: Window,
     cursor: [f64; 2],
@@ -63,7 +63,6 @@ impl App {
         .unwrap();
 
         Self {
-            gl: GlGraphics::new(OpenGL::V3_2),
             pool: pool,
             window: window,
             cursor: Default::default(),
@@ -93,7 +92,7 @@ impl App {
         }
     }
 
-    pub fn render(&mut self, args: &RenderArgs) {
+    pub fn render(&mut self, event: &Event) {
         use graphics::*;
 
         const LIFE_COLOR: Color = [0.0, 0.0, 0.0, 1.0];
@@ -103,7 +102,18 @@ impl App {
 
         let selected_pool = self.get_selected_pool();
 
-        self.gl.draw(args.viewport(), |c, g| {
+        // Load font for text
+        let assets = find_folder::Search::ParentsThenKids(1, 1)
+            .for_folder("assets")
+            .expect("assets directory not found.");
+        const FONT_NAME: &str = "FiraSans-Regular.ttf";
+        let ref font_path = assets.join(FONT_NAME);
+        let mut glyphs = self
+            .window
+            .load_font(font_path)
+            .expect(&format!("Cannot load font {}", FONT_NAME));
+
+        self.window.draw_2d(event, |c, g, device| {
             // Clear the screen.
             clear(DEAD_COLOR, g);
 
@@ -142,20 +152,19 @@ impl App {
             }
             // TODO : render paused logo, key bindings
 
-            let assets = find_folder::Search::ParentsThenKids(3, 3)
-                .for_folder("assets")
-                .expect("assets directory not found.");
-            let ref font = assets.join("FiraSans-Regular.ttf");
-            let mut glyph_cache = GlyphCache::new(font, (), TextureSettings::new()).unwrap();
-            text::Text::new_color(TEXT_COLOR, 32)
+            const TEXT_HORIZONTAL_OFFSET: Scalar = 10.0;
+            const TEXT_VERTICAL_OFFSET: Scalar = 20.0;
+            text::Text::new_color(TEXT_COLOR, 16)
                 .draw(
-                    "Hello opengl_graphics!",
-                    &mut glyph_cache,
+                    &format!("Speed : {}%", self.percent_speed),
+                    &mut glyphs,
                     &DrawState::default(),
-                    c.transform.trans(10.0, 100.0),
+                    c.transform
+                        .trans(TEXT_HORIZONTAL_OFFSET, TEXT_VERTICAL_OFFSET),
                     g,
                 )
                 .unwrap();
+            glyphs.factory.encoder.flush(device);
         });
     }
 
@@ -209,7 +218,7 @@ impl App {
         }
     }
 
-    fn process_keyboard(&mut self, key: Key, events: &mut Events) {
+    fn process_keyboard(&mut self, key: Key) {
         match key {
             // Space : Pause / Resume when space is pressed
             Key::Space => self.paused = !self.paused,
@@ -219,21 +228,24 @@ impl App {
             Key::R => self.pool.randomize(),
             // Right / Left : modify speed
             Key::Left => {
-                if self.percent_speed > 0 {
+                // Weird logic to set 1 instead of zero.
+                if self.percent_speed == 10 {
+                    self.percent_speed = 1;
+                } else if self.percent_speed > 10 {
                     self.percent_speed -= Self::SPEED_STEP as u8;
                 }
-                if self.percent_speed == 0 {
-                    self.percent_speed = 1;
-                }
+
                 let new_update_per_second = Self::MAX_FPS * self.percent_speed as u64 / 100;
-                events.set_ups(new_update_per_second);
+                self.window.set_ups(new_update_per_second);
             }
             Key::Right => {
-                if self.percent_speed < 100 {
+                if self.percent_speed == 1 {
+                    self.percent_speed = 10;
+                } else if self.percent_speed < 100 {
                     self.percent_speed += Self::SPEED_STEP as u8;
                 }
                 let new_update_per_second = Self::MAX_FPS * self.percent_speed as u64 / 100;
-                events.set_ups(new_update_per_second);
+                self.window.set_ups(new_update_per_second);
             }
             // 1 : select glider
             Key::NumPad1 => self.select_or_deselect_pool(SelectedPoolStructure::Glider),
@@ -249,19 +261,11 @@ impl App {
 
     pub fn run(&mut self) {
         let update_per_second = Self::MAX_FPS * self.percent_speed as u64 / 100;
-        let event_settings = EventSettings {
-            max_fps: Self::MAX_FPS,
-            ups: update_per_second,
-            lazy: false,
-            ..Default::default()
-        };
+        self.window.set_max_fps(Self::MAX_FPS);
+        self.window.set_ups(update_per_second);
+        self.window.set_lazy(false);
 
-        let mut events = Events::new(event_settings);
-        //events.set_ups(10);
-        while let Some(e) = events.next(&mut self.window) {
-            // see https://docs.piston.rs/piston_window/piston_window/trait.EventLoop.html
-            // This has a set_ups method
-
+        while let Some(e) = self.window.next() {
             // First capture mouse position.
             e.mouse_cursor(|pos| {
                 self.cursor = pos.clone();
@@ -275,16 +279,15 @@ impl App {
             }
             self.handle_pressed_mouse();
             if let Some(Button::Keyboard(key)) = e.press_args() {
-                self.process_keyboard(key, &mut events);
+                self.process_keyboard(key);
             };
             // Update state accordingly.
             if let Some(args) = e.update_args() {
                 self.update(&args);
             }
             // Finally render.
-            if let Some(args) = e.render_args() {
-                self.render(&args);
-            }
+
+            self.render(&e);
         }
     }
 }

@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
+find_folder = "0.3.0"
+
 piston = "0.53.0"
 piston_window = "0.128.0"
 piston2d-graphics = "0.43.0"
 piston2d-opengl_graphics = "0.82.0"
-find_folder = "0.3.0"
