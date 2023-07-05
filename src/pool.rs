@@ -23,25 +23,6 @@ impl fmt::Display for Pool {
         Ok(())
     }
 }
-
-// TODO
-// #[allow(dead_code)]
-// impl ops::Add<Pool> for Pool {
-//     type Output = Self;
-
-//     fn add(self, other: Pool) -> Pool {
-//         let height = min(self.height(), other.height());
-//         let width = min(self.width(), other.width());
-//         let mut result = Pool::new(width, height);
-
-//         for i in 0..height {
-//             for j in 0..width {
-//                 result.state[i as usize][j as usize] = self.get_cell(i, j) || other.get_cell(i, j)
-//             }
-//         }
-//         result
-//     }
-// }
 #[allow(dead_code)]
 impl ops::AddAssign<Pool> for Pool {
     fn add_assign(&mut self, other: Pool) {
@@ -180,6 +161,7 @@ impl Pool {
     }
 
     pub fn step(&mut self) {
+        // TODO : multithread this
         let mut next_state = self.state.clone();
         for i in 0..self.height() {
             for j in 0..self.width() {
@@ -208,6 +190,9 @@ impl Pool {
         }
         return result;
     }
+
+    // TODO fn rotated(&self, angle)->Pool
+    // TODO fn mirrored(&self, horizontal:bool, vertical:bool)->Pool
 }
 
 #[cfg(test)]

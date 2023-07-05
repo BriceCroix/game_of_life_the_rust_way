@@ -1,11 +1,12 @@
 mod pool;
 
-use glutin_window::GlutinWindow as Window;
-use opengl_graphics::{GlGraphics, OpenGL};
+use graphics::types::Color;
+use opengl_graphics::{GlGraphics, GlyphCache, OpenGL, TextureSettings};
 use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
 use piston::window::WindowSettings;
 use piston::{Button, EventLoop, Key, MouseButton, MouseCursorEvent, PressEvent, ReleaseEvent};
+use piston_window::PistonWindow as Window;
 
 use pool::Pool;
 
@@ -95,15 +96,16 @@ impl App {
     pub fn render(&mut self, args: &RenderArgs) {
         use graphics::*;
 
-        const LIFE_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
-        const DEAD_COLOR: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
-        const HINT_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 0.5];
+        const LIFE_COLOR: Color = [0.0, 0.0, 0.0, 1.0];
+        const DEAD_COLOR: Color = [1.0, 1.0, 1.0, 1.0];
+        const HINT_COLOR: Color = [0.0, 0.0, 0.0, 0.5];
+        const TEXT_COLOR: Color = [1.0, 0.1, 0.1, 1.0];
 
         let selected_pool = self.get_selected_pool();
 
-        self.gl.draw(args.viewport(), |c, gl| {
+        self.gl.draw(args.viewport(), |c, g| {
             // Clear the screen.
-            clear(DEAD_COLOR, gl);
+            clear(DEAD_COLOR, g);
 
             // Draw a square for each living cell
             for i in 0..HEIGHT {
@@ -114,7 +116,7 @@ impl App {
                             LIFE_COLOR,
                             rectangle::square(0.0, 0.0, PIXEL_PER_CELL as f64),
                             c.transform.trans(j_px as f64, i_px as f64),
-                            gl,
+                            g,
                         );
                     }
                 }
@@ -133,12 +135,27 @@ impl App {
                             HINT_COLOR,
                             rectangle::square(0.0, 0.0, PIXEL_PER_CELL as f64),
                             c.transform.trans(hint_column_px as f64, hint_row_px as f64),
-                            gl,
+                            g,
                         );
                     }
                 }
             }
             // TODO : render paused logo, key bindings
+
+            let assets = find_folder::Search::ParentsThenKids(3, 3)
+                .for_folder("assets")
+                .expect("assets directory not found.");
+            let ref font = assets.join("FiraSans-Regular.ttf");
+            let mut glyph_cache = GlyphCache::new(font, (), TextureSettings::new()).unwrap();
+            text::Text::new_color(TEXT_COLOR, 32)
+                .draw(
+                    "Hello opengl_graphics!",
+                    &mut glyph_cache,
+                    &DrawState::default(),
+                    c.transform.trans(10.0, 100.0),
+                    g,
+                )
+                .unwrap();
         });
     }
 
