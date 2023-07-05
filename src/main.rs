@@ -35,6 +35,7 @@ pub struct App {
     mouse_button_pressed: Option<MouseButton>,
     selected_pool_structure: SelectedPoolStructure,
     percent_speed: u8,
+    render_help: bool,
 }
 impl Default for App {
     fn default() -> Self {
@@ -70,6 +71,7 @@ impl App {
             mouse_button_pressed: None,
             selected_pool_structure: Default::default(),
             percent_speed: 10,
+            render_help: true,
         }
     }
 
@@ -98,7 +100,7 @@ impl App {
         const LIFE_COLOR: Color = [0.0, 0.0, 0.0, 1.0];
         const DEAD_COLOR: Color = [1.0, 1.0, 1.0, 1.0];
         const HINT_COLOR: Color = [0.0, 0.0, 0.0, 0.5];
-        const TEXT_COLOR: Color = [1.0, 0.1, 0.1, 1.0];
+        const TEXT_COLOR: Color = [0.9, 0.1, 0.1, 1.0];
 
         let selected_pool = self.get_selected_pool();
 
@@ -106,7 +108,7 @@ impl App {
         let assets = find_folder::Search::ParentsThenKids(1, 1)
             .for_folder("assets")
             .expect("assets directory not found.");
-        const FONT_NAME: &str = "FiraSans-Regular.ttf";
+        const FONT_NAME: &str = "FiraSans-Bold.ttf";
         let ref font_path = assets.join(FONT_NAME);
         let mut glyphs = self
             .window
@@ -150,21 +152,93 @@ impl App {
                     }
                 }
             }
-            // TODO : render paused logo, key bindings
 
-            const TEXT_HORIZONTAL_OFFSET: Scalar = 10.0;
-            const TEXT_VERTICAL_OFFSET: Scalar = 20.0;
-            text::Text::new_color(TEXT_COLOR, 16)
-                .draw(
-                    &format!("Speed : {}%", self.percent_speed),
-                    &mut glyphs,
-                    &DrawState::default(),
-                    c.transform
-                        .trans(TEXT_HORIZONTAL_OFFSET, TEXT_VERTICAL_OFFSET),
-                    g,
-                )
-                .unwrap();
-            glyphs.factory.encoder.flush(device);
+            if self.render_help {
+                const TEXT_HORIZONTAL_OFFSET: Scalar = 10.0;
+                const TEXT_VERTICAL_OFFSET: Scalar = 20.0;
+                const TEXT_FONT_SIZE: u32 = 16;
+                let mut vertical_position = TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &format!("← → : Speed : {}%", self.percent_speed),
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                vertical_position += TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &"H : toggle help",
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                vertical_position += TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &"Space : pause",
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                vertical_position += TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &"Left click : set cell",
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                vertical_position += TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &"Right click : kill cell",
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                vertical_position += TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &"del : clear screen",
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                vertical_position += TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &"R : randomize",
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                vertical_position += TEXT_VERTICAL_OFFSET;
+                text::Text::new_color(TEXT_COLOR, TEXT_FONT_SIZE)
+                    .draw(
+                        &"1-2 : select structure",
+                        &mut glyphs,
+                        &DrawState::default(),
+                        c.transform.trans(TEXT_HORIZONTAL_OFFSET, vertical_position),
+                        g,
+                    )
+                    .unwrap();
+                glyphs.factory.encoder.flush(device);
+            }
         });
     }
 
@@ -224,8 +298,10 @@ impl App {
             Key::Space => self.paused = !self.paused,
             // Del : Clear pool
             Key::Delete => self.pool.clear(),
-            // r : Randomize pool
+            // R : Randomize pool
             Key::R => self.pool.randomize(),
+            // T : toggle help
+            Key::H => self.render_help = !self.render_help,
             // Right / Left : modify speed
             Key::Left => {
                 // Weird logic to set 1 instead of zero.
