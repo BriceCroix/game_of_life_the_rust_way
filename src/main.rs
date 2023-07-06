@@ -105,14 +105,11 @@ impl App {
         let selected_pool = self.get_selected_pool();
 
         // Load font for text
-        let assets = find_folder::Search::ParentsThenKids(1, 1)
-            .for_folder("assets")
-            .expect("assets directory not found.");
+        const ASSETS: &str = "assets/";
         const FONT_NAME: &str = "FiraSans-Bold.ttf";
-        let ref font_path = assets.join(FONT_NAME);
         let mut glyphs = self
             .window
-            .load_font(font_path)
+            .load_font(ASSETS.to_owned() + FONT_NAME)
             .expect(&format!("Cannot load font {}", FONT_NAME));
 
         self.window.draw_2d(event, |c, g, device| {
