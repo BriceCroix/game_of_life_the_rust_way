@@ -1,5 +1,10 @@
 use rand::Rng;
-use std::{cmp::min, fmt, ops};
+use std::{
+    cmp::min,
+    fmt, ops,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 #[allow(dead_code)]
 pub struct Pool {
@@ -161,17 +166,38 @@ impl Pool {
     }
 
     pub fn step(&mut self) {
-        // TODO : multithread this
-        let mut next_state = self.state.clone();
-        for i in 0..self.height() {
-            for j in 0..self.width() {
-                next_state[i as usize][j as usize] = Self::get_next_state(
-                    self.state[i as usize][j as usize],
-                    self.count_alive_neighbors(i, j),
-                );
-            }
+        const THREAD_COUNT: u32 = 6;
+        // Actual thread count may be less than planned if pool is small
+        let thread_count = min(THREAD_COUNT, self.height());
+        // The line indices on which each thread will operate, thread i works from index thread_indices[i] included to thread_indices[i] excluded
+        let mut thread_indices = vec![0u32; thread_count as usize + 1];
+        for (i, index) in thread_indices.iter_mut().enumerate() {
+            *index = (i as u32) * self.height() / thread_count;
         }
-        self.state = next_state;
+
+        // Next state has to be mutex-guarded in order for multiple threads to write to it.
+        let next_state = Arc::new(Mutex::new(self.state.clone()));
+
+        thread::scope(|s| {
+            for thread in 0..thread_count {
+                let start = &thread_indices[thread as usize];
+                let stop = &thread_indices[thread as usize + 1];
+                s.spawn(|| {
+                    for i in *start..*stop {
+                        for j in 0..self.width() {
+                            let cell_state = Self::get_next_state(
+                                self.state[i as usize][j as usize],
+                                self.count_alive_neighbors(i, j),
+                            );
+                            next_state.lock().unwrap()[i as usize][j as usize] = cell_state;
+                        }
+                    }
+                });
+            }
+        });
+
+        // Move next state out of its shell (avoid cloning)
+        self.state = Arc::try_unwrap(next_state).unwrap().into_inner().unwrap();
     }
 
     pub fn set_cell(&mut self, row: u32, column: u32, state: bool) {
