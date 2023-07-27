@@ -1,10 +1,5 @@
 use rand::Rng;
-use std::{
-    cmp::min,
-    fmt, ops,
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::{cmp::min, fmt, ops, thread};
 
 #[allow(dead_code)]
 pub struct Pool {
@@ -167,37 +162,47 @@ impl Pool {
 
     pub fn step(&mut self) {
         const THREAD_COUNT: u32 = 6;
-        // Actual thread count may be less than planned if pool is small
-        let thread_count = min(THREAD_COUNT, self.height());
         // The line indices on which each thread will operate, thread i works from index thread_indices[i] included to thread_indices[i] excluded
-        let mut thread_indices = vec![0u32; thread_count as usize + 1];
-        for (i, index) in thread_indices.iter_mut().enumerate() {
-            *index = (i as u32) * self.height() / thread_count;
+        let mut thread_indices = vec![0u32; THREAD_COUNT as usize + 1];
+        for (thread, row_index) in thread_indices.iter_mut().enumerate() {
+            *row_index = (thread as u32) * self.height() / THREAD_COUNT;
         }
 
-        // Next state has to be mutex-guarded in order for multiple threads to write to it.
-        let next_state = Arc::new(Mutex::new(self.state.clone()));
-
-        thread::scope(|s| {
-            for thread in 0..thread_count {
+        self.state = thread::scope(|s| {
+            let mut handles = Vec::with_capacity(THREAD_COUNT as usize);
+            // Spawn worker threads that handle subsets of the state, slices along rows.
+            for thread in 0..THREAD_COUNT {
                 let start = &thread_indices[thread as usize];
                 let stop = &thread_indices[thread as usize + 1];
-                s.spawn(|| {
-                    for i in *start..*stop {
-                        for j in 0..self.width() {
-                            let cell_state = Self::get_next_state(
-                                self.state[i as usize][j as usize],
-                                self.count_alive_neighbors(i, j),
+                handles.push(s.spawn(|| {
+                    let start = *start;
+                    let stop = *stop;
+                    // Create a part of the next state
+                    let width_part = self.width() as usize;
+                    let height_part = (stop - start) as usize;
+                    let mut next_state_part = vec![vec![false; width_part]; height_part];
+
+                    for (i, row) in next_state_part.iter_mut().enumerate() {
+                        for (j, cell) in row.iter_mut().enumerate() {
+                            let complete_state_row_index = i as u32 + start;
+                            *cell = Self::get_next_state(
+                                self.state[complete_state_row_index as usize][j],
+                                self.count_alive_neighbors(complete_state_row_index, j as u32),
                             );
-                            next_state.lock().unwrap()[i as usize][j as usize] = cell_state;
                         }
                     }
-                });
+                    next_state_part
+                }));
             }
-        });
 
-        // Move next state out of its shell (avoid cloning)
-        self.state = Arc::try_unwrap(next_state).unwrap().into_inner().unwrap();
+            // Join worker threads, concatenate subsets to complete result.
+            let mut next_state_parts = Vec::with_capacity(THREAD_COUNT as usize);
+            for handle in handles.into_iter() {
+                next_state_parts.push(handle.join().unwrap());
+            }
+            // Return result out of scope.
+            next_state_parts.into_iter().flatten().collect()
+        });
     }
 
     pub fn set_cell(&mut self, row: u32, column: u32, state: bool) {
